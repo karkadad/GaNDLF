@@ -18,30 +18,6 @@ from GANDLF.models import global_models_dict
 from openvino.inference_engine import IECore, IENetwork
 import openvino
 
-def ov_model_load():
-    model_xml='FP32/unet.xml'
-    model_bin='FP32/unet.bin'
-    ie = IECore()
-    print('-------------------------------------------------------------------------')
-
-    ir_net = ie.read_network(model=model_xml, weights=model_bin)
-
-    print('----------------------- Read IR net -------------------')
-
-    input_name = next(iter(ir_net.inputs))
-    output_name = next(iter(ir_net.outputs))
-
-    print('Input name:{}'.format(input_name))
-    print('Output name:{}'.format(output_name))
-
-    # config = {}
-    # config['CPU_THREADS_NUM'] = str('48')
-    #exec_net = ie.load_network(network=ir_net, device_name=device, config=config)
-    ie.set_config({'CACHE_DIR': '/home/sdp/dkarkada/benchmark_models_OV/model_caches'}, '')
-    exec_net = ie.load_network(network=ir_net, device_name=device)
-
-    return exec_net
-
 def inference_loop(inferenceDataFromPickle, device, parameters, outputDir):
     """
     The main training loop.
