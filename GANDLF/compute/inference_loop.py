@@ -15,6 +15,32 @@ from GANDLF.data.ImagesFromDataFrame import ImagesFromDataFrame
 from GANDLF.utils import populate_channel_keys_in_params, send_model_to_device
 from GANDLF.models import global_models_dict
 
+from openvino.inference_engine import IECore, IENetwork
+import openvino
+
+def ov_model_load():
+    model_xml='FP32/unet.xml'
+    model_bin='FP32/unet.bin'
+    ie = IECore()
+    print('-------------------------------------------------------------------------')
+
+    ir_net = ie.read_network(model=model_xml, weights=model_bin)
+
+    print('----------------------- Read IR net -------------------')
+
+    input_name = next(iter(ir_net.inputs))
+    output_name = next(iter(ir_net.outputs))
+
+    print('Input name:{}'.format(input_name))
+    print('Output name:{}'.format(output_name))
+
+    # config = {}
+    # config['CPU_THREADS_NUM'] = str('48')
+    #exec_net = ie.load_network(network=ir_net, device_name=device, config=config)
+    ie.set_config({'CACHE_DIR': '/home/sdp/dkarkada/benchmark_models_OV/model_caches'}, '')
+    exec_net = ie.load_network(network=ir_net, device_name=device)
+
+    return exec_net
 
 def inference_loop(inferenceDataFromPickle, device, parameters, outputDir):
     """
@@ -52,8 +78,38 @@ def inference_loop(inferenceDataFromPickle, device, parameters, outputDir):
         if not os.path.isfile(file_to_check):
             raise ValueError("The model specified model was not found:", file_to_check)
 
-    main_dict = torch.load(file_to_check, map_location=torch.device(device))
-    model.load_state_dict(main_dict["model_state_dict"])
+    print('Parameters:{}'.format(parameters))
+
+    if parameters["framework"] == 'OpenVINO':
+        #TODO: Add a way to pass the IR path
+        model_xml='/home/bduser/dkarkada/3dunet_karkadad_GaNDLF/GaNDLF/3dresunet_OV_FP32/3dresunet.xml'
+        model_bin='/home/bduser/dkarkada/3dunet_karkadad_GaNDLF/GaNDLF/3dresunet_OV_FP32/3dresunet.bin'
+        ie = IECore()
+        print('-------------------------------------------------------------------------')
+
+        ir_net = ie.read_network(model=model_xml, weights=model_bin)
+
+        print('----------------------- Read IR net -------------------')
+
+        input_name = next(iter(ir_net.inputs))
+        output_name = next(iter(ir_net.outputs))
+
+        print('Input name:{}'.format(input_name))
+        print('Output name:{}'.format(output_name))
+
+        # config = {}
+        # config['CPU_THREADS_NUM'] = str('48')
+        #exec_net = ie.load_network(network=ir_net, device_name=device, config=config)
+        model = ie.load_network(network=ir_net, device_name=device.upper())
+        parameters["model"]["amp"] = None
+        parameters["device"] = device
+    
+    else:
+        main_dict = torch.load(file_to_check, map_location=torch.device(device))
+        model.load_state_dict(main_dict["model_state_dict"], strict=False)
+        model, parameters["model"]["amp"], parameters["device"] = send_model_to_device(
+        model, parameters["model"]["amp"], device, optimizer=None
+        )
 
     if not (os.environ.get("HOSTNAME") is None):
         print("\nHostname     :" + str(os.environ.get("HOSTNAME")), flush=True)
@@ -63,17 +119,20 @@ def inference_loop(inferenceDataFromPickle, device, parameters, outputDir):
     parameters["save_output"] = True
 
     print("Data Samples: ", len(inference_loader.dataset), flush=True)
-    model, parameters["model"]["amp"], parameters["device"] = send_model_to_device(
-        model, parameters["model"]["amp"], device, optimizer=None
-    )
 
     print("Using device:", parameters["device"], flush=True)
 
     # radiology inference
     if parameters["modality"] == "rad":
-        average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
-            model, inference_loader, None, parameters, mode="inference"
-        )
+        if parameters["framework"] == 'OpenVINO':
+            average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
+                model, inference_loader, None, parameters, mode="inference", input_name=input_name, output_name=output_name, frmwk='OpenVINO'
+            )
+
+        else:
+            average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
+                model, inference_loader, None, parameters, mode="inference"
+            )
         print(average_epoch_valid_loss, average_epoch_valid_metric)
     elif (parameters["modality"] == "path") or (parameters["modality"] == "histo"):
         # histology inference
@@ -205,5 +264,5 @@ if __name__ == "__main__":
         inferenceDataFromPickle=inferenceDataFromPickle,
         parameters=parameters,
         outputDir=args.outputDir,
-        device=args.device,
+        device=args.device
     )

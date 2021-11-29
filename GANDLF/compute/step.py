@@ -3,7 +3,7 @@ import psutil
 from .loss_and_metric import get_loss_and_metrics
 
 
-def step(model, image, label, params):
+def step(model, image, label, params, input_name=None, output_name=None, frmwk=None):
     """
     Function that steps the model for a single batch
 
@@ -28,16 +28,16 @@ def step(model, image, label, params):
         The final output of the model
 
     """
-    if params["verbose"]:
-        print(torch.cuda.memory_summary())
-        print(
-            "|===========================================================================|\n|                             CPU Utilization                            |\n|"
-        )
-        print("Load_Percent   :", psutil.cpu_percent(interval=None))
-        print("MemUtil_Percent:", psutil.virtual_memory()[2])
-        print(
-            "|===========================================================================|\n|"
-        )
+    # if params["verbose"]:
+    #     print(torch.cuda.memory_summary())
+    #     print(
+    #         "|===========================================================================|\n|                             CPU Utilization                            |\n|"
+    #     )
+    #     print("Load_Percent   :", psutil.cpu_percent(interval=None))
+    #     print("MemUtil_Percent:", psutil.virtual_memory()[2])
+    #     print(
+    #         "|===========================================================================|\n|"
+    #     )
 
     # for the weird cases where mask is read as an RGB image, ensure only the first channel is used
     if params["problem_type"] == "segmentation":
@@ -64,7 +64,11 @@ def step(model, image, label, params):
         with torch.cuda.amp.autocast():
             output = model(image)
     else:
-        output = model(image)
+        if frmwk == 'OpenVINO':
+            out = model.infer(inputs={input_name: image})
+            output = torch.from_numpy(out[output_name])
+        else:
+            output = model(image)
 
     if "medcam_enabled" in params and params["medcam_enabled"]:
         output, attention_map = output

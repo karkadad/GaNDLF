@@ -5,6 +5,7 @@ import numpy as np
 parameter_defaults = {
     "weighted_loss": False,  # whether weighted loss is to be used or not
     "verbose": False,  # general application verbosity
+    "framework": 'OpenVINO',  # general application verbosity
     "q_verbose": False,  # queue construction verbosity
     "medcam_enabled": False,  # interpretability via medcam
     "save_output": False,  # save outputs during validation/testing

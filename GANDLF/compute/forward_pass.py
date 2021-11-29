@@ -15,8 +15,9 @@ from .step import step
 from .loss_and_metric import get_loss_and_metrics
 
 
+
 def validate_network(
-    model, valid_dataloader, scheduler, params, epoch=0, mode="validation"
+    model, valid_dataloader, scheduler, params, epoch=0, mode="validation", input_name=None, output_name=None, frmwk=None
 ):
     """
     Function to validate a network for a single epoch
@@ -70,8 +71,11 @@ def validate_network(
 
     pathlib.Path(current_output_dir).mkdir(parents=True, exist_ok=True)
 
-    # Set the model to valid
-    model.eval()
+    if frmwk == 'OpenVINO':
+        pass
+    else:
+        # Set the model to valid
+        model.eval()
     # # putting stuff in individual arrays for correlation analysis
     # all_targets = []
     # all_predics = []
@@ -140,18 +144,18 @@ def validate_network(
             generator = sampler(tio_subject, num_patches=params["q_samples_per_volume"])
             pred_output = 0
             for patch in generator:
-                image = torch.cat(
-                    [patch[key][torchio.DATA] for key in params["channel_keys"]], dim=0
-                )
-                valuesToPredict = torch.cat(
-                    [patch["value_" + key] for key in params["value_keys"]], dim=0
-                )
-                image = image.unsqueeze(0)
-                image = image.float().to(params["device"])
-                ## special case for 2D
-                if image.shape[-1] == 1:
-                    image = torch.squeeze(image, -1)
-                pred_output += model(image)
+                    image = torch.cat(
+                        [patch[key][torchio.DATA] for key in params["channel_keys"]], dim=0
+                    )
+                    valuesToPredict = torch.cat(
+                        [patch["value_" + key] for key in params["value_keys"]], dim=0
+                    )
+                    image = image.unsqueeze(0)
+                    image = image.float().to(params["device"])
+                    ## special case for 2D
+                    if image.shape[-1] == 1:
+                        image = torch.squeeze(image, -1)
+                    pred_output += model(image)
             pred_output = pred_output.cpu() / params["q_samples_per_volume"]
             pred_output /= params["scaling_factor"]
             # all_predics.append(pred_output.double())
@@ -194,6 +198,7 @@ def validate_network(
             output_prediction = 0  # this is used for regression/classification
             current_patch = 0
             is_segmentation = True
+            result = None
             for patches_batch in patch_loader:
                 if params["verbose"]:
                     print(
@@ -231,8 +236,10 @@ def validate_network(
                         image.shape,
                         flush=True,
                     )
-
-                result = step(model, image, label, params)
+                if frmwk == 'OpenVINO':
+                    result = step(model, image, label, params, input_name, output_name, frmwk='OpenVINO')
+                else:
+                    result = step(model, image, label, params)
 
                 # get the current attention map and add it to its aggregator
                 if params["medcam_enabled"]:
