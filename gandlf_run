@@ -72,6 +72,14 @@ if __name__ == "__main__":
         help="Show program's version number and exit.",
     )
 
+    parser.add_argument(
+        "-q", "--quantize",
+        metavar="",
+        default=False,
+        type=ast.literal_eval,
+        help="Whether to quantize the model",
+    )
+
     args = parser.parse_args()
 
     # check for required parameters - this is needed here to keep the cli clean
@@ -84,7 +92,7 @@ if __name__ == "__main__":
         sys.exit("ERROR: Configuration file not found!")
     
     main_run(
-        args.inputdata, args.config, args.modeldir, args.train, args.device, args.resetprev
+        args.inputdata, args.config, args.modeldir, args.train, args.device, args.resetprev, args.quantize
     )
 
     print("Finished.")

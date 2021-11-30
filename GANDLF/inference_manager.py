@@ -1,4 +1,5 @@
 from GANDLF.compute import inference_loop
+from GANDLF.compute import quantize_loop
 import os
 import numpy as np
 import torch
@@ -39,12 +40,21 @@ def InferenceManager(dataframe, outputDir, parameters, device):
 
     for fold_dir in fold_dirs:
         parameters["current_fold_dir"] = fold_dir
-        inference_loop(
-            inferenceDataFromPickle=inferenceData_full,
-            outputDir=fold_dir,
-            device=device,
-            parameters=parameters,
-        )
+        if parameters["quantize"] == True:
+            quantize_loop(
+                inferenceDataFromPickle=inferenceData_full,
+                outputDir=fold_dir,
+                device=device,
+                parameters=parameters,
+            )
+
+        else:
+            inference_loop(
+                inferenceDataFromPickle=inferenceData_full,
+                outputDir=fold_dir,
+                device=device,
+                parameters=parameters,
+            )
 
         if parameters["problem_type"] == "classification":
             logits_dir = os.path.join(fold_dir, "logits.csv")

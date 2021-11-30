@@ -7,7 +7,7 @@ from GANDLF.parseConfig import parseConfig
 from GANDLF.utils import populate_header_in_parameters, parseTrainingCSV
 
 
-def main_run(data_csv, config_file, output_dir, train_mode, device, reset_prev):
+def main_run(data_csv, config_file, output_dir, train_mode, device, reset_prev, quantize):
     """
     Main function that runs the training and inference.
 
@@ -40,6 +40,7 @@ def main_run(data_csv, config_file, output_dir, train_mode, device, reset_prev):
 
         parameters["data_preprocessing"] = {}
     parameters["output_dir"] = output_dir
+    parameters["quantize"] = quantize
 
     reset_prev = reset_prev
 
@@ -92,5 +93,5 @@ def main_run(data_csv, config_file, output_dir, train_mode, device, reset_prev):
             dataframe=data_full,
             outputDir=parameters["output_dir"],
             parameters=parameters,
-            device=device,
+            device=device
         )
