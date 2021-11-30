@@ -58,8 +58,8 @@ def inference_loop(inferenceDataFromPickle, device, parameters, outputDir):
 
     if parameters["framework"] == 'OpenVINO':
         #TODO: Add a way to pass the IR path
-        model_xml='/home/bduser/dkarkada/3dunet_karkadad_GaNDLF/GaNDLF/3dresunet_OV_FP32/3dresunet.xml'
-        model_bin='/home/bduser/dkarkada/3dunet_karkadad_GaNDLF/GaNDLF/3dresunet_OV_FP32/3dresunet.bin'
+        model_xml='/home/bduser/dkarkada/3dunet_karkadad_GaNDLF/GaNDLF/3dresunet_OV_INT8/3dresunet.xml'
+        model_bin='/home/bduser/dkarkada/3dunet_karkadad_GaNDLF/GaNDLF/3dresunet_OV_INT8/3dresunet.bin'
         ie = IECore()
         print('-------------------------------------------------------------------------')
 

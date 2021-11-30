@@ -288,6 +288,8 @@ def validate_network(
             }
         }
     ]
+
+    int8_directory = "3dresunet_OV_INT8"
         
     accuracy_aware_quantization = False
 
@@ -314,7 +316,7 @@ def validate_network(
     metric_results_FP32 = pipeline.evaluate(model)
 
     compressed_model = pipeline.run(model)
-    save_model(compressed_model, args.int8_directory)
+    save_model(compressed_model, int8_directory)
 
     metric_results_INT8 = pipeline.evaluate(compressed_model)
 
@@ -331,6 +333,6 @@ def validate_network(
 
 
     print(bcolors.BOLD + "\nThe INT8 version of the model has been saved to the directory ".format(args.int8_directory) + \
-        bcolors.HEADER + "{}\n".format(args.int8_directory) + bcolors.ENDC)
+        bcolors.HEADER + "{}\n".format(int8_directory) + bcolors.ENDC)
 
     return 0.0, metric_results_INT8
