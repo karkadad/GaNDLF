@@ -79,6 +79,10 @@ requirements = [
     "zarr==2.10.3",
     "pydicom",
     "onnx",
+    "openvino-dev",
+    "addict",
+    "defusedxml",
+    "texttable",
 ]
 
 # pytorch doesn't have LTS support on OSX - https://github.com/CBICA/GaNDLF/issues/389

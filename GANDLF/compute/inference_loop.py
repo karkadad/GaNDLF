@@ -96,7 +96,7 @@ def inference_loop(
                     )
                 )
             model, input_blob, output_blob = load_ov_model(xml_to_check, device.upper())
-            parameters["model"]["IO"] = [input_blob, output_blob]
+            parameters["model"]["IO"] = [input_blob, output_blob]           
     else:
         raise ValueError(
             "The model type is not recognized: ", parameters["model"]["type"]
@@ -114,11 +114,20 @@ def inference_loop(
         parameters = populate_channel_keys_in_params(inference_loader, parameters)
 
         print("Data Samples: ", len(inference_loader.dataset), flush=True)
-
-        average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
-            model, inference_loader, None, parameters, mode="inference"
-        )
-        print(average_epoch_valid_loss, average_epoch_valid_metric)
+        
+        if parameters["model"]["type"].lower() == "openvino" and parameters["model"]["data_type"].upper() == "INT8" and \
+            parameters["model"]["optimization_mode"] == "post_training_quantization":
+            from .seg_quantize import validate_network
+            average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
+                model, inference_loader, outputDir_or_optimizedModel, None, parameters, mode="inference"
+            )
+            print(average_epoch_valid_metric)
+        else:
+            from .forward_pass import validate_network
+            average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
+                model, inference_loader, None, parameters, mode="inference"
+            )
+            print(average_epoch_valid_loss, average_epoch_valid_metric)
     elif parameters["modality"] in ["path", "histo"]:
         # set some defaults
         if not "slide_level" in parameters:
