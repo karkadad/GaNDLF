@@ -552,14 +552,17 @@ def parseConfig(config_file_path, version_check_flag=True):
                     print(
                         "WARNING: Setting default optimization mode to 'post_training_quantization'"
                     )
-                    params["model"]["optimization_mode"] = "post_training_quantization" # Default optimization mode is post training quantization
+                    # Default optimization mode is post training quantization
+                    params["model"]["optimization_mode"] = "post_training_quantization" 
                 if not ("quantization_mode" in params["model"]):
                     print(
                         "WARNING: Setting default quantization mode to 'DefaultQuantization'"
                     )
-                    params["model"]["quantization_mode"] = "DefaultQuantization" # Default optimization mode is post training quantization
+                    # Default optimization mode is post training quantization
+                    params["model"]["quantization_mode"] = "DefaultQuantization" 
             else:
-                sys.exit("The model quantization optimizations are only supported for the OpenVINO framework")
+                sys.exit("The model quantization optimizations are only supported \
+                         for the OpenVINO framework")
 
         # set default save strategy for model
         if not ("save_at_every_epoch" in params["model"]):
