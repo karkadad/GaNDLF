@@ -5,11 +5,9 @@ name: CI-PyTest
 
 on:
   push:
-    branches: [ master ]
-    branches: [ ov_quantization ]
+    branches: [ master, ov_quantization ]
   pull_request:
     branches: [ master ]
-    branches: [ ov_quantization ]
 
 jobs:
   build:
