@@ -241,8 +241,6 @@ class MyMetric(Metric):
             # one-hot encoding of 'label' will probably be needed for segmentation
             loss, metric_output = get_loss_and_metrics(output, truth, output, self.params)
 
-            print(metric_output)
-
             return metric_output
 
 
@@ -334,21 +332,6 @@ def validate_network(
     print(bcolors.BOLD + "Performing INT8 quantization on the model" + bcolors.ENDC)
     compressed_model = pipeline.run(model)
     save_model(compressed_model, int8_directory)
-
-    print(bcolors.BOLD + "Evaluating performance on the quantized model" + bcolors.ENDC)
-    metric_results_INT8 = pipeline.evaluate(compressed_model)
-
-    print(bcolors.BOLD + "\nFINAL RESULTS" + bcolors.ENDC)
-
-    # print metric value
-    if metric_results_FP32:
-        for name, value in metric_results_FP32.items():
-            print(bcolors.OKGREEN + "{: <27s} FP32: {}".format(name, value) + bcolors.ENDC)
-
-    if metric_results_INT8:
-        for name, value in metric_results_INT8.items():
-            print(bcolors.OKBLUE + "{: <27s} INT8: {}".format(name, value) + bcolors.ENDC)
-
 
     print(bcolors.BOLD + "\nThe INT8 version of the model has been saved to the directory ".format(int8_directory) + \
         bcolors.HEADER + "{}\n".format(int8_directory) + bcolors.ENDC)
