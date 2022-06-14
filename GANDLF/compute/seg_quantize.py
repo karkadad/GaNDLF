@@ -241,8 +241,6 @@ class MyMetric(Metric):
             # one-hot encoding of 'label' will probably be needed for segmentation
             loss, metric_output = get_loss_and_metrics(output, truth, output, self.params)
 
-            print(metric_output)
-
             return metric_output
 
 
