@@ -2043,3 +2043,52 @@ def test_train_segmentation_transunet_rad_3d(device):
     )
 
     print("passed")
+
+def test_train_segmentation_rad_3d_quantization(device):
+    print("41: Starting 3D Rad segmentation post training optimizations tests")
+    # read and parse csv
+    # read and initialize parameters for specific data dimension
+    parameters = parseConfig(
+        testingDir + "/config_segmentation_quantization.yaml", version_check_flag=False
+    )
+    training_data, parameters["headers"] = parseTrainingCSV(
+        inputDir + "/train_3d_rad_segmentation.csv"
+    )
+    parameters["modality"] = "rad"
+    parameters["patch_size"] = patch_size["3D"]
+    parameters["model"]["dimension"] = 3
+    parameters["model"]["class_list"] = [0, 1]
+    parameters["model"]["final_layer"] = "softmax"
+    parameters["model"]["amp"] = True
+    parameters["in_memory"] = True
+    parameters["model"]["num_channels"] = len(parameters["headers"]["channelHeaders"])
+    parameters["model"]["onnx_export"] = True
+    parameters = populate_header_in_parameters(parameters, parameters["headers"])
+    # loop through selected models and train for single epoch
+    parameters["model"]["architecture"] = "unet"
+    parameters["nested_training"]["testing"] = -5
+    parameters["nested_training"]["validation"] = -5
+
+    sanitize_outputDir()
+    TrainingManager(
+        dataframe=training_data,
+        outputDir=outputDir,
+        parameters=parameters,
+        device=device,
+        resume=False,
+        reset=True,
+    )
+
+    parameters["model"]["type"] = "openvino"
+    parameters["model"]["data_type"] = "INT8"
+    parameters["model"]["optimization_mode"] = "post_training_quantization"
+    parameters["model"]["quantization_mode"] = "DefaultQuantization"
+    parameters["output_dir"] = outputDir  # this is in inference mode
+    InferenceManager(
+        dataframe=training_data,
+        outputDir=outputDir,
+        parameters=parameters,
+        device=device,
+    )
+
+    print("passed")
