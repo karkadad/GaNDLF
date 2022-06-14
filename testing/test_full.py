@@ -2044,6 +2044,7 @@ def test_train_segmentation_transunet_rad_3d(device):
 
     print("passed")
 
+
 def test_train_segmentation_rad_3d_quantization(device):
     print("41: Starting 3D Rad segmentation post training optimizations tests")
     # read and parse csv
