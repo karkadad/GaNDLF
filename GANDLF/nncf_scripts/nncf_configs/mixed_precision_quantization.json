@@ -1,0 +1,56 @@
+{
+    "model": "3dresunet",
+    "model_dir":"/home/bduser/dkarkada/GaNDLF_v12/GaNDLF/3dresunet_exp_nncf/data_dir",
+    "model_name":"resunet_best.pth.tar",
+    "batch_size" : 1,
+    "pretrained": true,
+    "epochs": 1,
+    "device": "cpu",
+    "cpu_only": true,
+    "input_info": {
+        "sample_size": [
+            1,
+            1,
+            128,
+            128,
+            128
+        ]
+    },
+    "optimizer": {
+        "type": "adam",
+        "base_lr": 0.001,
+        "weight_decay": 5e-5,
+        "steps": [
+            4764000
+        ],
+        "optimizer_params":
+        {
+            "amsgrad": false
+        }
+    },
+    "accuracy_aware_training": {
+	    "mode":"early_exit",
+        "params": {
+            "maximal_relative_accuracy_degradation": 0.1,
+            "initial_training_phase_epochs": 100,
+            "patience_epochs": 30
+        }
+    },
+    "compression": {
+            "algorithm": "quantization",
+            "initializer": {
+                "range": {
+                    "num_init_samples": 50, // Number of samples from the training dataset to consume as sample model inputs for purposes of setting initial minimum and maximum quantization ranges
+                    "type": "min_max" // Type of the initializer - determines which statistics gathered during initialization will be used to initialize the quantization ranges. "mean_min_max" is used by default
+                },
+                "precision": {
+                    "type": "hawq", // Type of precision initialization - either "manual" or "hawq". With "manual", precisions are defined explicitly via "bitwidth_per_scope". With "hawq", these are determined automatically using the HAWQ algorithm.
+                    "bits": [4, 8], // A list of bitwidth to choose from when performing precision initialization. Overrides bitwidth constraints specified in `weight` and `activation` sections",
+                    "num_data_points": 100, // Number of data points to iteratively estimate Hessian trace, 100 by default.
+                    "iter_number": 200, // Maximum number of iterations of Hutchinson algorithm to estimate Hessian trace, 200 by default
+                    "tolerance": 1e-4, //  Minimum relative tolerance for stopping the Hutchinson algorithm. It's calculated between mean average trace from previous iteration and current one. 1e-4 by default
+                    "compression_ratio": 1.5, // The desired ratio between bits complexity of fully INT8 model and mixed-precision lower-bit one.
+                }
+            }
+    }
+}

@@ -1,0 +1,57 @@
+{
+    "model": "3dresunet",
+    "model_dir":"/home/bduser/dkarkada/GaNDLF_v12/GaNDLF/3dresunet_exp_nncf/data_dir",
+    "model_name":"resunet_best.pth.tar",
+    "batch_size" : 1,
+    "pretrained": true,
+    "epochs": 1,
+    "device": "cpu",
+    "cpu_only": true,
+    "input_info": {
+        "sample_size": [
+            1,
+            1,
+            128,
+            128,
+            128
+        ]
+    },
+    "optimizer": {
+        "type": "adam",
+        "base_lr": 0.001,
+        "weight_decay": 5e-5,
+        "steps": [
+            4764000
+        ],
+        "optimizer_params":
+        {
+            "amsgrad": false
+        }
+    },
+    "accuracy_aware_training": {
+	    "mode":"early_exit",
+        "params": {
+            "maximal_relative_accuracy_degradation": 0.1,
+            "initial_training_phase_epochs": 100,
+            "patience_epochs": 30
+        }
+    },
+    "compression": {
+            "algorithm": "binarization",
+            "initializer": {
+                "batchnorm_adaptation": {
+                    "num_bn_adaptation_samples": 0, // Number of samples from the training dataset to pass through the model at initialization in order to update batchnorm statistics of the original model. The actual number of samples will be a closest multiple of the batch size.
+                }
+            },
+            "mode": "xnor", // Selects the mode of binarization - either 'xnor' for XNOR binarization, or 'dorefa' for DoReFa binarization
+            "params": {
+                "batch_multiplier": 1,  // Gradients will be accumulated for this number of batches before doing a 'backward' call
+                "activations_quant_start_epoch": 1,  // Epoch to start binarizing activations
+                "weights_quant_start_epoch": 1,  // Epoch to start binarizing weights
+                "lr_poly_drop_start_epoch": 1,  // Epoch to start dropping the learning rate
+                "lr_poly_drop_duration_epochs": 1,  // Duration, in epochs, of the learning rate dropping process.
+                "disable_wd_start_epoch": 1  // Epoch to disable weight decay in the optimizer
+            },
+
+    }
+}

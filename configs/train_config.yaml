@@ -1,0 +1,181 @@
+# affix version
+version:
+  {
+    minimum: 0.0.15,
+    maximum: 0.0.15 # this should NOT be made a variable, but should be tested after every tag is created
+  }
+## Choose the model parameters here
+model:
+  {
+    dimension: 3, # the dimension of the model and dataset: defines dimensionality of computations
+    base_filters: 16, # Set base filters: number of filters present in the initial module of the U-Net convolution; for IncU-Net, keep this divisible by 4
+    architecture: resunet, # options: unet, resunet, deep_resunet, deep_unet, light_resunet, light_unet, fcn, uinc, vgg, densenet
+    norm_type: instance, # options: batch, instance, or none (only for VGG); used for all networks
+    final_layer: softmax, # can be either sigmoid, softmax or none (none == regression)
+    # sigmoid_input_multiplier: 1.0, # this is used during sigmoid, and defaults to 1.0
+    class_list: [0, 1], # Set the list of labels the model should train on and predict
+    # class_list: '[*range(0,100,1)]' # a range of values from 0 to 99 with a step of 1 will be created; customize as needed, but ensure this is defined as a string as it will be passed through 'eval' function
+    # class_list: '[0,1||2||3,1||4,4]', # combinatorial training - this will construct one-hot encoded mask using logical operands between specified annotations. Note that double '|' or '&' should be passed and not single to avoid python parsing
+    ignore_label_validation: 0, # this is the location of the class_list whose performance is ignore during validation metric calculation
+    amp: True, # Set if you want to use Automatic Mixed Precision for your operations or not - options: True, False
+    num_channels: 1, # set the input channels - useful when reading RGB or images that have vectored pixel types from the CSV
+    # save_at_every_epoch: True, # allows you to save the model at every epoch
+
+    ## densenet models have the following optional parameters:
+    # growth_rate (int) - how many filters to add each layer (k in paper)
+    # num_init_features (int) - the number of filters to learn in the first convolution layer
+    # bn_size (int) - multiplicative factor for number of bottle neck layers
+    # (i.e. bn_size * k features in the bottleneck layer)
+    # drop_rate (float) - dropout rate after each dense layer
+    # num_classes (int) - number of classification classes
+    # final_convolution_layer (str) - the final convolutional layer to use
+    # norm_type (str) - the normalization type to use
+  }
+## metrics to evaluate the validation performance
+metrics:
+  - dice # segmentation
+  # - hausdorff # hausdorff 100 percentile, segmentation
+  # - hausdorff95 # hausdorff 95 percentile, segmentation
+  # - mse # regression/classification
+  # - accuracy # classification
+  # - classification_accuracy # classification
+  # - balanced_accuracy # classification ## more details https://scikit-learn.org/stable/modules/generated/sklearn.metrics.balanced_accuracy_score.html
+  # - f1 # classification/segmentation
+  # - precision # classification/segmentation ## more details https://torchmetrics.readthedocs.io/en/latest/references/modules.html#id3
+  # - recall # classification/segmentation ## more details https://torchmetrics.readthedocs.io/en/latest/references/modules.html#id4
+  # - iou # classification/segmentation ## more details https://torchmetrics.readthedocs.io/en/latest/references/modules.html#iou
+## this customizes the inference, primarily used for segmentation outputs
+inference_mechanism: {
+  grid_aggregator_overlap: average, # this option provides the option to strategize the grid aggregation output; should be either 'crop' or 'average' - https://torchio.readthedocs.io/patches/patch_inference.html#grid-aggregator
+  patch_overlap: 0, # amount of overlap of patches during inference, defaults to 0; see https://torchio.readthedocs.io/patches/patch_inference.html#gridsampler
+}
+# this is to enable or disable lazy loading - setting to true reads all data once during data loading, resulting in improvements
+# in I/O at the expense of memory consumption
+in_memory: False
+# this will save the generated masks for validation and testing data for qualitative analysis
+save_output: False
+# this will save the patches used during training for qualitative analysis
+save_training: False
+# Set the Modality : rad for radiology, path for histopathology
+modality: rad
+## Patch size during training - 2D patch for breast images since third dimension is not patched
+patch_size: [240, 240, 144]
+# uniform: UniformSampler or label: LabelSampler
+patch_sampler: uniform
+# patch_sampler: label
+# patch_sampler:
+#   {
+#     label:
+#       {
+#         padding_type: constant # how the label gets padded, for options, see 'mode' in https://numpy.org/doc/stable/reference/generated/numpy.pad.html
+#       }
+#   }
+# If enabled, this parameter pads images and labels when label sampler is used
+enable_padding: False
+# Number of epochs
+num_epochs: 100
+# Set the patience - measured in number of epochs after which, if the performance metric does not improve, exit the training loop - defaults to the number of epochs
+patience: 5
+# Set the batch size
+batch_size: 4
+# gradient clip : norm, value, agc
+clip_mode: norm
+# clip_gradient value
+clip_grad: 0.1
+## Set the initial learning rate
+learning_rate: 0.001
+# Learning rate scheduler - options:"triangle", "triangle_modified", "exp", "step", "reduce-on-plateau", "cosineannealing", "triangular", "triangular2", "exp_range"
+# triangle/triangle_modified use LambdaLR but triangular/triangular2/exp_range uses CyclicLR
+scheduler: triangle_modified
+# Set which loss function you want to use - options : 'dc' - for dice only, 'dcce' - for sum of dice and CE and you can guess the next (only lower-case please)
+# options: dc (dice only), dc_log (-log of dice), ce (), dcce (sum of dice and ce), mse () ...
+# mse is the MSE defined by torch and can define a variable 'reduction'; see https://pytorch.org/docs/stable/generated/torch.nn.MSELoss.html#torch.nn.MSELoss
+# use mse_torch for regression/classification problems and dice for segmentation
+loss_function: dice
+# this parameter weights the loss to handle imbalanced losses better
+weighted_loss: False
+#loss_function:
+#  {
+#    'mse':{
+#      'reduction': 'mean' # see https://pytorch.org/docs/stable/generated/torch.nn.MSELoss.html#torch.nn.MSELoss for all options
+#    }
+#  }
+# Which optimizer do you want to use - sgd, asgd, adam, adamw, adamax, sparseadam, rprop, adadelta, adagrad, rmsprop,
+# each has their own options and functionalities, which are initialized with defaults, see GANDLF.optimizers.wrap_torch for details
+optimizer: adam
+## this parameter controls the nested training process
+# performs randomized k-fold cross-validation
+# split is performed using sklearn's KFold method
+# for single fold run, use '-' before the fold number
+nested_training:
+  {
+    testing: 1, # this controls the testing data splits for final model evaluation; use '1' if this is to be disabled
+    validation: 5 # this controls the validation data splits for model training
+  }
+## pre-processing
+# this constructs an order of transformations, which is applied to all images in the data loader
+# order: all_methods_as_specified_in_dict --> normalize [normalization methods always applied at the end]
+# 'to_canonical': change the image to canonical orientation, see https://torchio.readthedocs.io/transforms/preprocessing.html#torchio.transforms.ToCanonical
+# 'rgba2rgb': convert images from rgba to rgb
+# 'threshold': performs intensity thresholding; i.e., if x[i] < min: x[i] = 0; and if x[i] > max: x[i] = 0
+# 'clip': performs intensity clipping; i.e., if x[i] < min: x[i] = min; and if x[i] > max: x[i] = max
+# 'threshold'/'clip': if either min/max is not defined, it is taken as the minimum/maximum of the image, respectively
+# 'normalize': performs z-score normalization: https://torchio.readthedocs.io/transforms/preprocessing.html#torchio.transforms.ZNormalization
+# 'normalize_positive':perform z-score normalize but with mean and std-dev calculated on only pixels > 0
+# 'normalize_nonZero': perform z-score normalize but with mean and std-dev calculated on only non-zero pixels
+# 'normalize_nonZero_masked': perform z-score normalize but with mean and std-dev calculated on only non-zero pixels with the stats applied on non-zero pixels
+# 'crop_external_zero_planes': crops all non-zero planes from input tensor to reduce image search space
+# 'resample: resolution: X,Y,Z': resample the voxel resolution: https://torchio.readthedocs.io/transforms/preprocessing.html#torchio.transforms.Resample
+# 'resample: resolution: X': resample the voxel resolution in an isotropic manner: https://torchio.readthedocs.io/transforms/preprocessing.html#torchio.transforms.Resample
+# resize the image(s) and mask (this should be greater than or equal to patch_size); resize is done ONLY when resample is not defined -- WARNING: resizing images on the fly ensures that images get loaded in memory, which dramatically increases RAM usage
+# 'resize_image' resizes the image and mask BEFORE applying any another operation
+# 'resize_patch' resizes the image and mask AFTER extracting the patch
+data_preprocessing:
+  {
+    'normalize',
+  }
+## various data augmentation techniques
+# options: affine, elastic, downsample, motion, kspace, bias, blur, gaussianNoise, swap
+# keep/edit as needed
+# all transforms: https://torchio.readthedocs.io/transforms/transforms.html
+# 'kspace': one of ghosting or spiking is picked (randomly) for augmentation
+# 'probability' subkey adds the probability of the particular augmentation getting added during training (this is always 1 for normalize and resampling)
+data_augmentation:
+  {
+    default_probability: 0.15,
+    'blur': {
+      'std': [0, 1]
+    },
+    'flip': {
+      'axis': [0, 1, 2]
+    },
+    'rotate_90': {
+      'probability': 0.25
+    },
+    'rotate_180': {
+      'probability': 0.25
+    }, # explicitly rotate image by 180; if 'axis' isn't defined, default is [1,2,3]
+  }
+# ## post-processing steps - only applied before output labels are saved
+# data_postprocessing:
+#   {
+#     'fill_holes', # this will fill holes in the image
+#     'mapping': {0: 0, 1: 1, 2: 4}, # this will map the labels to a new set of labels, useful to convert labels from combinatorial training (i.e., combined segmentation labels)
+#   }
+## parallel training on HPC - here goes the command to prepend to send to a high performance computing
+# cluster for parallel computing during multi-fold training
+# not used for single fold training
+# this gets passed before the training_loop, so ensure enough memory is provided along with other parameters
+# that your HPC would expect
+# ${outputDir} will be changed to the outputDir you pass in CLI + '/${fold_number}'
+# ensure that the correct location of the virtual environment is getting invoked, otherwise it would pick up the system python, which might not have all dependencies
+#parallel_compute_command: 'qsub -b y -l A40=1 -l h_vmem=72G -M sid.cre8er@gmail.com -m b -m e -pre threaded=16 -cwd -o ${outputDir}/\$JOB_ID.stdout -e ${outputDir}/\$JOB_ID.stderr /cbica/home/thakurs/comp_space/projects/Optimization/gandlf_brainextraction/Submit_Scripts/sge_wrapper /cbica/home/thakurs/.conda/envs/gandlf/bin/python'
+## queue configuration - https://torchio.readthedocs.io/data/patch_training.html?#queue
+# this determines the maximum number of patches that can be stored in the queue. Using a large number means that the queue needs to be filled less often, but more CPU memory is needed to store the patches
+q_max_length: 50
+# this determines the number of patches to extract from each volume. A small number of patches ensures a large variability in the queue, but training will be slower
+q_samples_per_volume: 1
+# this determines the number subprocesses to use for data loading; '0' means main process is used
+q_num_workers: 16 # scale this according to available CPU resources
+# used for debugging
+q_verbose: False

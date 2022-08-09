@@ -115,25 +115,15 @@ def inference_loop(
 
         print("Data Samples: ", len(inference_loader.dataset), flush=True)
 
-        if (
-            parameters["model"]["type"].lower() == "openvino"
-            and parameters["model"]["data_type"].upper() == "INT8"
-            and parameters["model"]["optimization_mode"] == "post_training_quantization"
-        ):
+        if parameters["model"]["type"].lower() == "openvino" and parameters["model"]["data_type"].upper() == "INT8" and \
+            parameters["model"]["optimization_mode"] == "post_training_quantization":
             from .seg_quantize import validate_network
-
             average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
-                model,
-                inference_loader,
-                outputDir_or_optimizedModel,
-                None,
-                parameters,
-                mode="inference",
+                model, inference_loader, outputDir_or_optimizedModel, None, parameters, mode="inference"
             )
             print(average_epoch_valid_metric)
         else:
             from .forward_pass import validate_network
-
             average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
                 model, inference_loader, None, parameters, mode="inference"
             )
