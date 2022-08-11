@@ -6,15 +6,15 @@
     "batch_size": 1,
     "pretrained": true,
     "epochs": 2,
-    "device": "cpu",
-    "cpu_only": true,
+    "device": "cuda",
+    "cpu_only": false,
     "input_info": {
         "sample_size": [
             1,
             1,
-            128,
-            128,
-            128
+            240,
+            240,
+            144
         ]
     },
     "optimizer": {

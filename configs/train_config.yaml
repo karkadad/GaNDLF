@@ -59,7 +59,7 @@ save_training: False
 # Set the Modality : rad for radiology, path for histopathology
 modality: rad
 ## Patch size during training - 2D patch for breast images since third dimension is not patched
-patch_size: [240, 240, 144]
+patch_size: [240 , 240, 144]
 # uniform: UniformSampler or label: LabelSampler
 patch_sampler: uniform
 # patch_sampler: label
@@ -77,7 +77,7 @@ num_epochs: 100
 # Set the patience - measured in number of epochs after which, if the performance metric does not improve, exit the training loop - defaults to the number of epochs
 patience: 5
 # Set the batch size
-batch_size: 4
+batch_size: 1
 # gradient clip : norm, value, agc
 clip_mode: norm
 # clip_gradient value

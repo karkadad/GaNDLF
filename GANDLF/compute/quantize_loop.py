@@ -1,4 +1,4 @@
-#from .forward_pass import validate_network
+# from .forward_pass import validate_network
 from .seg_quantize import validate_network
 import os
 
@@ -18,6 +18,7 @@ from GANDLF.models import global_models_dict
 
 from openvino.inference_engine import IECore, IENetwork
 import openvino
+
 
 def quantize_loop(inferenceDataFromPickle, device, parameters, outputDir):
     """
@@ -55,41 +56,43 @@ def quantize_loop(inferenceDataFromPickle, device, parameters, outputDir):
         if not os.path.isfile(file_to_check):
             raise ValueError("The model specified model was not found:", file_to_check)
 
-    print('Parameters:{}'.format(parameters))
+    print("Parameters:{}".format(parameters))
     input_name = None
     output_name = None
 
-    if parameters["framework"] == 'OpenVINO':
-        #TODO: Add a way to pass the IR path
-        model_xml='/home/bduser/dkarkada/GaNDLF_v14/GaNDLF/brats_2020_exp/OV_models/FP32/resunet_best.xml'
-        model_bin='/home/bduser/dkarkada/GaNDLF_v14/GaNDLF/brats_2020_exp/OV_models/FP32/resunet_best.bin'
+    if parameters["framework"] == "OpenVINO":
+        # TODO: Add a way to pass the IR path
+        model_xml = "/home/bduser/dkarkada/GaNDLF_v14/GaNDLF/brats_2020_exp/OV_models/FP32/resunet_best.xml"
+        model_bin = "/home/bduser/dkarkada/GaNDLF_v14/GaNDLF/brats_2020_exp/OV_models/FP32/resunet_best.bin"
         ie = IECore()
-        print('-------------------------------------------------------------------------')
+        print(
+            "-------------------------------------------------------------------------"
+        )
 
         ir_net = ie.read_network(model=model_xml, weights=model_bin)
 
-        print('----------------------- Read IR net -------------------')
+        print("----------------------- Read IR net -------------------")
 
         input_name = next(iter(ir_net.inputs))
         output_name = next(iter(ir_net.outputs))
 
-        print('Input name:{}'.format(input_name))
-        print('Output name:{}'.format(output_name))
+        print("Input name:{}".format(input_name))
+        print("Output name:{}".format(output_name))
 
         # config = {}
         # config['CPU_THREADS_NUM'] = str('48')
-        #exec_net = ie.load_network(network=ir_net, device_name=device, config=config)
+        # exec_net = ie.load_network(network=ir_net, device_name=device, config=config)
         model = ie.load_network(network=ir_net, device_name=device.upper())
         parameters["model"]["amp"] = None
         parameters["device"] = device
         parameters = populate_channel_keys_in_params(inference_loader, parameters)
         parameters["save_output"] = True
-    
+
     else:
         main_dict = torch.load(file_to_check, map_location=torch.device(device))
         model.load_state_dict(main_dict["model_state_dict"], strict=False)
         model, parameters["model"]["amp"], parameters["device"] = send_model_to_device(
-        model, parameters["model"]["amp"], device, optimizer=None
+            model, parameters["model"]["amp"], device, optimizer=None
         )
         # get the channel keys for concatenation later (exclude non numeric channel keys)
         parameters = populate_channel_keys_in_params(inference_loader, parameters)
@@ -113,9 +116,16 @@ def quantize_loop(inferenceDataFromPickle, device, parameters, outputDir):
 
     # radiology inference
     if parameters["modality"] == "rad":
-        if parameters["framework"] == 'OpenVINO':
+        if parameters["framework"] == "OpenVINO":
             average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
-                model, inference_loader, None, parameters, mode="inference", input_name=input_name, output_name=output_name, frmwk=parameters["framework"]
+                model,
+                inference_loader,
+                None,
+                parameters,
+                mode="inference",
+                input_name=input_name,
+                output_name=output_name,
+                frmwk=parameters["framework"],
             )
 
         else:
@@ -253,5 +263,5 @@ if __name__ == "__main__":
         inferenceDataFromPickle=inferenceDataFromPickle,
         parameters=parameters,
         outputDir=args.outputDir,
-        device=args.device
+        device=args.device,
     )

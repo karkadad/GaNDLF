@@ -26,22 +26,23 @@ from openvino.tools.pot.graph.model_utils import compress_model_weights
 from openvino.tools.pot.pipeline.initializer import create_pipeline
 from openvino.tools.pot.utils.logger import init_logger
 
+
 class bcolors:
     """
     Just gives us some colors for the text
     """
-    HEADER = '\033[95m'
-    OKBLUE = '\033[94m'
-    OKGREEN = '\033[92m'
-    WARNING = '\033[93m'
-    FAIL = '\033[91m'
-    ENDC = '\033[0m'
-    BOLD = '\033[1m'
-    UNDERLINE = '\033[4m'
+
+    HEADER = "\033[95m"
+    OKBLUE = "\033[94m"
+    OKGREEN = "\033[92m"
+    WARNING = "\033[93m"
+    FAIL = "\033[91m"
+    ENDC = "\033[0m"
+    BOLD = "\033[1m"
+    UNDERLINE = "\033[4m"
 
 
 class MyDataLoader(DataLoader):
-
     def __init__(self, config, params, valid_dataloader):
 
         super().__init__(config)
@@ -67,7 +68,9 @@ class MyDataLoader(DataLoader):
         self.batch_size = 1
 
         for batch_idx, (subject) in enumerate(
-            tqdm(self.valid_dataloader, desc="Creating patches from the calibration data")
+            tqdm(
+                self.valid_dataloader, desc="Creating patches from the calibration data"
+            )
         ):
             if self.params["verbose"]:
                 print("== Current subject:", subject["subject_id"], flush=True)
@@ -103,7 +106,8 @@ class MyDataLoader(DataLoader):
                 )
 
             grid_sampler = torchio.inference.GridSampler(
-                torchio.Subject(subject_dict), self.params["patch_size"],
+                torchio.Subject(subject_dict),
+                self.params["patch_size"],
                 patch_overlap=self.params["inference_mechanism"]["patch_overlap"],
             )
             patch_loader = torch.utils.data.DataLoader(grid_sampler, batch_size=1)
@@ -112,7 +116,9 @@ class MyDataLoader(DataLoader):
 
             for patches_batch in patch_loader:
                 if self.params["verbose"]:
-                    print('!!!!!!!!!!!!!! Currently in seg quantize module !!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
+                    print(
+                        "!!!!!!!!!!!!!! Currently in seg quantize module !!!!!!!!!!!!!!!!!!!!!!!!!!!!!"
+                    )
                     print(
                         "=== Current patch:",
                         current_patch,
@@ -152,7 +158,6 @@ class MyDataLoader(DataLoader):
                 self.labels.append(label.numpy())
 
                 idx += 1
-
 
         self.items = np.arange(idx)
 
@@ -203,12 +208,12 @@ class MyMetric(Metric):
 
     @property
     def value(self):
-        """ Returns accuracy metric value for the last model output. """
+        """Returns accuracy metric value for the last model output."""
         return {self.name: [self._values[-1]]}
 
     @property
     def avg_value(self):
-        """ Returns accuracy metric value for all model outputs. """
+        """Returns accuracy metric value for all model outputs."""
         value = np.ravel(self._values).mean()
         print("Round #{}    Mean {} = {}".format(self.round, self.name, value))
 
@@ -217,7 +222,7 @@ class MyMetric(Metric):
         return {self.name: value}
 
     def update(self, outputs, labels):
-        """ Updates prediction matches.
+        """Updates prediction matches.
 
         Args:
             outputs: model output
@@ -239,18 +244,19 @@ class MyMetric(Metric):
             truth = torch.from_numpy(truth)
 
             # one-hot encoding of 'label' will probably be needed for segmentation
-            loss, metric_output = get_loss_and_metrics(output, truth, output, self.params)
+            loss, metric_output = get_loss_and_metrics(
+                output, truth, output, self.params
+            )
 
             print(metric_output)
 
             return metric_output
 
-
         metric_output = dice_score(outputs[0], labels[0])
-        self._values.append([metric_output['dice']])
+        self._values.append([metric_output["dice"]])
 
     def reset(self):
-        """ Resets collected matches """
+        """Resets collected matches"""
         self._values = []
 
     @property
@@ -261,56 +267,63 @@ class MyMetric(Metric):
     def get_attributes(self):
         return {self.name: {"direction": "higher-better", "type": ""}}
 
+
 def validate_network(
-    model, valid_dataloader, outputDir_or_optimizedModel, scheduler, parameters, epoch=0, mode="inference"):
-    model_config = Dict({
-        "model_name": 'resunet',
-        "model": os.path.join(
+    model,
+    valid_dataloader,
+    outputDir_or_optimizedModel,
+    scheduler,
+    parameters,
+    epoch=0,
+    mode="inference",
+):
+    model_config = Dict(
+        {
+            "model_name": "resunet",
+            "model": os.path.join(
                 outputDir_or_optimizedModel,
                 str(parameters["model"]["architecture"]) + "_best.xml",
             ),
-        "weights": os.path.join(
+            "weights": os.path.join(
                 outputDir_or_optimizedModel,
                 str(parameters["model"]["architecture"]) + "_best.bin",
-            )
-    })
-    dataset_config = {
-        "images": "image",
-        "labels": "label"
-    }
+            ),
+        }
+    )
+    dataset_config = {"images": "image", "labels": "label"}
 
-    engine_config = Dict({
-        "device": "CPU",
-        "stat_requests_number": 4,
-        "eval_requests_number": 4
-    })
+    engine_config = Dict(
+        {"device": "CPU", "stat_requests_number": 4, "eval_requests_number": 4}
+    )
 
     quantization_mode = str(parameters["model"]["quantization_mode"])
 
-    if not ("DefaultQuantization" in quantization_mode or "AccuracyAwareQuantization" in quantization_mode):
+    if not (
+        "DefaultQuantization" in quantization_mode
+        or "AccuracyAwareQuantization" in quantization_mode
+    ):
         raise ValueError(
-            "The specified quantization mode is not supported: {0}.".format(quantization_mode)
+            "The specified quantization mode is not supported: {0}.".format(
+                quantization_mode
+            )
         )
 
     quantization_algorithm = [
         {
             "name": quantization_mode,
-            "params": {
-                "target_device": "ANY",
-                "preset": "performance"
-            }
+            "params": {"target_device": "ANY", "preset": "performance"},
         }
     ]
 
-    int8_directory = outputDir_or_optimizedModel + '/INT8'
+    int8_directory = outputDir_or_optimizedModel + "/INT8"
     if os.path.isdir(int8_directory):
-        print(
-            f" The existing quantization optimized models will be replaced"
-        )
+        print(f" The existing quantization optimized models will be replaced")
     else:
         os.mkdir(int8_directory)
 
-    accuracy_aware_quantization = True if "AccuracyAwareQuantization" in quantization_mode else False
+    accuracy_aware_quantization = (
+        True if "AccuracyAwareQuantization" in quantization_mode else False
+    )
 
     model = load_model(model_config)
 
@@ -327,8 +340,11 @@ def validate_network(
         print(bcolors.BOLD + "Default quantization method" + bcolors.ENDC)
         pipeline = create_pipeline(quantization_algorithm, engine)
 
-
-    print(bcolors.BOLD + "Evaluating performance on the non-quantized model" + bcolors.ENDC)
+    print(
+        bcolors.BOLD
+        + "Evaluating performance on the non-quantized model"
+        + bcolors.ENDC
+    )
     metric_results_FP32 = pipeline.evaluate(model)
 
     print(bcolors.BOLD + "Performing INT8 quantization on the model" + bcolors.ENDC)
@@ -343,14 +359,24 @@ def validate_network(
     # print metric value
     if metric_results_FP32:
         for name, value in metric_results_FP32.items():
-            print(bcolors.OKGREEN + "{: <27s} FP32: {}".format(name, value) + bcolors.ENDC)
+            print(
+                bcolors.OKGREEN + "{: <27s} FP32: {}".format(name, value) + bcolors.ENDC
+            )
 
     if metric_results_INT8:
         for name, value in metric_results_INT8.items():
-            print(bcolors.OKBLUE + "{: <27s} INT8: {}".format(name, value) + bcolors.ENDC)
+            print(
+                bcolors.OKBLUE + "{: <27s} INT8: {}".format(name, value) + bcolors.ENDC
+            )
 
-
-    print(bcolors.BOLD + "\nThe INT8 version of the model has been saved to the directory ".format(int8_directory) + \
-        bcolors.HEADER + "{}\n".format(int8_directory) + bcolors.ENDC)
+    print(
+        bcolors.BOLD
+        + "\nThe INT8 version of the model has been saved to the directory ".format(
+            int8_directory
+        )
+        + bcolors.HEADER
+        + "{}\n".format(int8_directory)
+        + bcolors.ENDC
+    )
 
     return 0.0, metric_results_INT8

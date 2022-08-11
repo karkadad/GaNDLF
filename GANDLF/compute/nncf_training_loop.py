@@ -190,7 +190,7 @@ def nncf_training_loop(
     params["output_dir"] = output_dir
 
     # Defining our model here according to parameters mentioned in the configuration file
-    #print("Number of channels : ", params["model"]["num_channels"])
+    # print("Number of channels : ", params["model"]["num_channels"])
 
     # Fetch the model according to params mentioned in the configuration file
     model = global_models_dict[params["model"]["architecture"]](parameters=params)

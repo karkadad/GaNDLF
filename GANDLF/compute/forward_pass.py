@@ -495,4 +495,4 @@ def validate_network(
             file.close()
 
     return average_epoch_valid_metric[metric]
-    #return average_epoch_valid_loss, average_epoch_valid_metric
+    # return average_epoch_valid_loss, average_epoch_valid_metric

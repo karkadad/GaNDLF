@@ -16,17 +16,21 @@ from GANDLF.compute import train_network
 from load_data_nncf import load_data
 
 parser = argparse.ArgumentParser(
-    description='Convert the NNCF PyTorch model to ONNX model.')
-parser.add_argument('-i', '--nncf_model',
-                    help='The NNCF compressed PyTorch model path.')
-parser.add_argument('-o', '--onnx_model',
-                    help='The exported ONNX model path.')
-parser.add_argument('-d', '--data_csv',
-                    help='The path to data csv containing path to images and labels.')
-parser.add_argument('-c', '--nncf_config',
-                    help="The NNCG config file")
-parser.add_argument('-p', '--config_file', required=False, 
-                    help='Config yaml file or the parameter file')
+    description="Convert the NNCF PyTorch model to ONNX model."
+)
+parser.add_argument(
+    "-i", "--nncf_model", help="The NNCF compressed PyTorch model path."
+)
+parser.add_argument("-o", "--onnx_model", help="The exported ONNX model path.")
+parser.add_argument(
+    "-d",
+    "--data_csv",
+    help="The path to data csv containing path to images and labels.",
+)
+parser.add_argument("-c", "--nncf_config", help="The NNCG config file")
+parser.add_argument(
+    "-p", "--config_file", required=False, help="Config yaml file or the parameter file"
+)
 args = parser.parse_args()
 
 
@@ -35,16 +39,18 @@ parameters = readConfig(config_file=args.config_file)
 
 print(parameters)
 
-model = global_models_dict[parameters["model"]
-                           ["architecture"]](parameters=parameters)
+model = global_models_dict[parameters["model"]["architecture"]](parameters=parameters)
 
 # # Provide data loaders for compression algorithm initialization, if necessary
 init_loader, parameters = load_data(args.data_csv, parameters)
-nncf_config = NNCFConfig.from_json(args.nncf_config) 
+nncf_config = NNCFConfig.from_json(args.nncf_config)
 nncf_config = register_default_init_args(nncf_config, init_loader)
 
 # load model
-main_dict = torch.load(args.nncf_model, map_location=torch.device('cpu'))
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print("Using device:", device)
+
+main_dict = torch.load(args.nncf_model, map_location=torch.device(device))
 model.load_state_dict(main_dict["model_state_dict"], strict=True)
 
 # Create compressed model
