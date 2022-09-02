@@ -245,14 +245,31 @@ def TrainingManager(dataframe, outputDir, parameters, device, resume, reset):
 
             # parallel_compute_command is an empty string, thus no parallel computing requested
             if (not parameters["parallel_compute_command"]) or (singleFoldValidation):
-                training_loop(
-                    training_data=trainingData,
-                    validation_data=validationData,
-                    output_dir=currentValOutputFolder,
-                    device=device,
-                    params=parameters,
-                    testing_data=testingData,
-                )
+                if parameters["model"]["optimization_mode"] in ['ptq', 'qat', 'fp', 'kd']:
+                    if parameters["model"]["optimization_mode"] == 'qat':
+                        from GANDLF.compute import nncf_training_loop
+                        nncf_training_loop(
+                        training_data=trainingData,
+                        validation_data=validationData,
+                        output_dir=outputDir,
+                        device=device,
+                        params=parameters,
+                        testing_data=None,
+                    )
+                    else:
+                        sys.exit(
+                                "Only the following optimizations are supported: \
+                                        Quantization aware training (qat) for now."
+                            )
+                else:
+                    training_loop(
+                        training_data=trainingData,
+                        validation_data=validationData,
+                        output_dir=currentValOutputFolder,
+                        device=device,
+                        params=parameters,
+                        testing_data=testingData,
+                    )
 
             else:
                 # call qsub here
@@ -326,11 +343,29 @@ def TrainingManager_split(
             )
             parameters = pickle.load(open(currentModelConfigPickle, "rb"))
 
-    training_loop(
-        training_data=dataframe_train,
-        validation_data=dataframe_validation,
-        output_dir=outputDir,
-        device=device,
-        params=parameters,
-        testing_data=None,
-    )
+    if parameters["model"]["optimization_mode"] in ['ptq', 'qat', 'fp', 'kd']:
+        if parameters["model"]["optimization_mode"] == 'qat':
+            from GANDLF.compute import nncf_training_loop
+            print('Starting NNCF training!!!')
+            nncf_training_loop(
+            training_data=dataframe_train,
+            validation_data=dataframe_validation,
+            output_dir=outputDir,
+            device=device,
+            params=parameters,
+            testing_data=None,
+        )
+        else:
+            sys.exit(
+                    "Only the following optimizations are supported: \
+                            Quantization aware training (qat) for now."
+                )
+    else:
+        training_loop(
+            training_data=dataframe_train,
+            validation_data=dataframe_validation,
+            output_dir=outputDir,
+            device=device,
+            params=parameters,
+            testing_data=None,
+        )

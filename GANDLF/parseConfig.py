@@ -535,6 +535,28 @@ def parseConfig(config_file_path, version_check_flag=True):
         # initialize openvino model data type for processing: if not defined, default to FP32
         if not ("data_type" in params["model"]):
             params["model"]["data_type"] = "FP32"
+        
+        # Check for low precision optimizations to be applied
+        if not ("optimization_mode" in params["model"]):
+            params["model"]["optimization_mode"] = None # No optimizations will be applied
+        else:
+            # Only the following optimizations are supported:
+            # post training static quantization (ptq)
+            # Quantization aware training (qat)
+            # Filter pruning (fp)
+            # Knowledge distillation (kd) 
+            if not (params["model"]["optimization_mode"] in ['ptq', 'qat', 'fp', 'kd']): 
+                sys.exit(
+                    "Only the following optimizations are supported: \
+                            post training static quantization (ptq) \
+                            Quantization aware training (qat) \
+                            Filter pruning (fp) \
+                            Knowledge distillation (kd)"
+                )
+            if not (params["model"]["nncf_config_path"]):
+                sys.exit(
+                    "Please provide a valid path to the NNCF config file"
+                )
 
         # set default save strategy for model
         if not ("save_at_every_epoch" in params["model"]):
