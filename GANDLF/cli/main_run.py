@@ -81,6 +81,7 @@ def main_run(data_csv, config_file, output_dir, train_mode, device, resume, rese
     else:
         data_full, headers = parseTrainingCSV(file_data_full, train=train_mode)
         parameters = populate_header_in_parameters(parameters, headers)
+        #print(f'Parameters with headers: {parameters}')
         if train_mode:
             TrainingManager(
                 dataframe=data_full,

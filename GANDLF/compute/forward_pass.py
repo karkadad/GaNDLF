@@ -52,6 +52,8 @@ def validate_network(
     total_epoch_valid_metric = {}
     average_epoch_valid_metric = {}
 
+    print(f'Model parameters: {params}')
+
     for metric in params["metrics"]:
         if "per_label" in metric:
             total_epoch_valid_metric[metric] = []

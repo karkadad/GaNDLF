@@ -108,6 +108,8 @@ if __name__ == "__main__":
     if not (os.path.isfile(args.config)):
         sys.exit("ERROR: Configuration file not found!")
 
+    print(f'Reset value: {args.reset}')
+
     main_run(
         args.inputdata,
         args.config,

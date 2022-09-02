@@ -71,7 +71,7 @@ def inference_loop(
                     "The specified model was not found: {0}.".format(file_to_check)
                 )
 
-        main_dict = torch.load(file_to_check)
+        main_dict = torch.load(file_to_check, map_location=torch.device(device))
         model.load_state_dict(main_dict["model_state_dict"])
         model.eval()
     elif parameters["model"]["type"].lower() == "openvino":
@@ -121,13 +121,14 @@ def inference_loop(
             and parameters["model"]["optimization_mode"] == "post_training_quantization"
         ):
             from .seg_quantize import validate_network
-
+            # model, valid_dataloader, outputDir_or_optimizedModel, scheduler, parameters, epoch=0, mode="inference"):
             average_epoch_valid_loss, average_epoch_valid_metric = validate_network(
-                model,
-                inference_loader,
-                outputDir_or_optimizedModel,
-                None,
-                parameters,
+                model=model,
+                valid_dataloader=inference_loader,
+                outputDir_or_optimizedModel=outputDir_or_optimizedModel,
+                scheduler=None,
+                parameters=parameters,
+                epoch=0,
                 mode="inference",
             )
             print(average_epoch_valid_metric)
