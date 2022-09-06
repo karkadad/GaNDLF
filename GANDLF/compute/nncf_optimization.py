@@ -1,35 +1,34 @@
 import os, time, psutil
 import torch
-from torch.utils.data import DataLoader
 from tqdm import tqdm
+import numpy as np
 import torchio
 from medcam import medcam
+
+from torch.utils.data import DataLoader
 
 from typing import Any
 from typing import Tuple
 from typing import Dict
 
-from GANDLF.data.ImagesFromDataFrame import ImagesFromDataFrame
+from GANDLF.data import get_testing_loader
 from GANDLF.grad_clipping.grad_scaler import GradScaler, model_parameters_exclude_head
 from GANDLF.grad_clipping.clip_gradients import dispatch_clip_grad_
-from GANDLF.models import global_models_dict
-from GANDLF.schedulers import global_schedulers_dict
-from GANDLF.optimizers import global_optimizer_dict
 from GANDLF.utils import (
     get_date_time,
-    send_model_to_device,
-    populate_channel_keys_in_params,
-    get_class_imbalance_weights,
     best_model_path_end,
     save_model,
     load_model,
     version_check,
     write_training_patches,
+    print_model_summary,
 )
 from GANDLF.logger import Logger
 from .step import step
 from .forward_pass import validate_network
+from .generic import create_pytorch_objects
 
+## NNCF related imports
 from nncf import NNCFConfig
 from nncf.torch.initialization import PTInitializingDataLoader
 from nncf.torch import create_compressed_model, register_default_init_args
@@ -38,7 +37,7 @@ from nncf.torch import create_compressed_model, register_default_init_args
 os.environ["TORCHIO_HIDE_CITATION_PROMPT"] = "1"
 
 
-def nncf_train_network(model, train_dataloader, optimizer, compression_ctrl, params):
+def nncf_train_network(model, train_dataloader, optimizer, params, compression_ctrl):
     """
     Function to train a network for a single epoch
 
@@ -70,20 +69,24 @@ def nncf_train_network(model, train_dataloader, optimizer, compression_ctrl, par
     average_epoch_train_metric = {}
 
     for metric in params["metrics"]:
-        total_epoch_train_metric[metric] = 0
+        if "per_label" in metric:
+            total_epoch_train_metric[metric] = []
+        else:
+            total_epoch_train_metric[metric] = 0
 
     # automatic mixed precision - https://pytorch.org/docs/stable/amp.html
     if params["model"]["amp"]:
-        print("Using Automatic mixed precision", flush=True)
         scaler = GradScaler()
+        if params["verbose"]:
+            print("Using Automatic mixed precision", flush=True)
 
     # Set the model to train
     model.train()
     for batch_idx, (subject) in enumerate(
         tqdm(train_dataloader, desc="Looping over training data")
     ):
-        compression_ctrl.scheduler.step()
         optimizer.zero_grad()
+        compression_ctrl.scheduler.step() ## NNCF Compression control step
         image = (
             torch.cat(
                 [subject[key][torchio.DATA] for key in params["channel_keys"]], dim=1
@@ -101,6 +104,12 @@ def nncf_train_network(model, train_dataloader, optimizer, compression_ctrl, par
         else:
             label = subject["label"][torchio.DATA]
         label = label.to(params["device"])
+
+        if params["save_training"]:
+            write_training_patches(
+                subject,
+                params,
+            )
 
         # ensure spacing is always present in params and is always subject-specific
         if "spacing" in subject:
@@ -145,28 +154,49 @@ def nncf_train_network(model, train_dataloader, optimizer, compression_ctrl, par
         if not nan_loss:
             total_epoch_train_loss += loss.detach().cpu().item()
         for metric in calculated_metrics.keys():
-            total_epoch_train_metric[metric] += calculated_metrics[metric]
+            if isinstance(total_epoch_train_metric[metric], list):
+                if len(total_epoch_train_metric[metric]) == 0:
+                    total_epoch_train_metric[metric] = np.array(
+                        calculated_metrics[metric]
+                    )
+                else:
+                    total_epoch_train_metric[metric] += np.array(
+                        calculated_metrics[metric]
+                    )
+            else:
+                total_epoch_train_metric[metric] += calculated_metrics[metric]
 
-        # For printing information at halftime during an epoch
-        if ((batch_idx + 1) % (len(train_dataloader) / 2) == 0) and (
-            (batch_idx + 1) < len(train_dataloader)
-        ):
-            print(
-                "\nHalf-Epoch Average Train loss : ",
-                total_epoch_train_loss / (batch_idx + 1),
-            )
-            for metric in params["metrics"]:
+        if params["verbose"]:
+            # For printing information at halftime during an epoch
+            if ((batch_idx + 1) % (len(train_dataloader) / 2) == 0) and (
+                (batch_idx + 1) < len(train_dataloader)
+            ):
                 print(
-                    "Half-Epoch Average Train " + metric + " : ",
-                    total_epoch_train_metric[metric] / (batch_idx + 1),
+                    "\nHalf-Epoch Average Train loss : ",
+                    total_epoch_train_loss / (batch_idx + 1),
                 )
+                for metric in params["metrics"]:
+                    if isinstance(total_epoch_train_metric[metric], np.ndarray):
+                        to_print = (
+                            total_epoch_train_metric[metric] / (batch_idx + 1)
+                        ).tolist()
+                    else:
+                        to_print = total_epoch_train_metric[metric] / (batch_idx + 1)
+                    print(
+                        "Half-Epoch Average Train " + metric + " : ",
+                        to_print,
+                    )
 
     average_epoch_train_loss = total_epoch_train_loss / len(train_dataloader)
     print("     Epoch Final   Train loss : ", average_epoch_train_loss)
     for metric in params["metrics"]:
-        average_epoch_train_metric[metric] = total_epoch_train_metric[metric] / len(
-            train_dataloader
-        )
+        if isinstance(total_epoch_train_metric[metric], np.ndarray):
+            to_print = (
+                total_epoch_train_metric[metric] / len(train_dataloader)
+            ).tolist()
+        else:
+            to_print = total_epoch_train_metric[metric] / len(train_dataloader)
+        average_epoch_train_metric[metric] = to_print
         print(
             "     Epoch Final   Train " + metric + " : ",
             average_epoch_train_metric[metric],
@@ -191,10 +221,6 @@ class NNCFSubjectsDataLoader(PTInitializingDataLoader):
         image = torch.cat(
                 [subject[str(key)][torchio.DATA] for key in range(1, self.num_channels+1)], dim=1).float().to('cpu')
         return (image,), {}
-
-    def get_target(self, dataloader_output: Any):
-        label = subject["label"][torchio.DATA].float().to('cpu')
-        return label
 
 def nncf_training_loop(
     training_data,
@@ -222,94 +248,40 @@ def nncf_training_loop(
         epochs = params["num_epochs"]
     params["device"] = device
     params["output_dir"] = output_dir
-
-    # Defining our model here according to parameters mentioned in the configuration file
-    #print("Number of channels : ", params["model"]["num_channels"])
-
-    # Set up the dataloaders
-    training_data_for_torch = ImagesFromDataFrame(training_data, params, train=True)
-
-    params = populate_channel_keys_in_params(training_data_for_torch, params)
-
-    print(f'Parameters after channels population: {params}')
-
-    # Fetch the model according to params mentioned in the configuration file
-    model = global_models_dict[params["model"]["architecture"]](parameters=params)
-
-    validation_data_for_torch = ImagesFromDataFrame(
-        validation_data, params, train=False
-    )
-
+    params["training_data"] = training_data
+    params["validation_data"] = validation_data
+    params["testing_data"] = testing_data
     testingDataDefined = True
-    if testing_data is None:
+    if params["testing_data"] is None:
         # testing_data = validation_data
         testingDataDefined = False
 
-    if testingDataDefined:
-        test_data_for_torch = ImagesFromDataFrame(testing_data, params, train=False)
+    # Defining our model here according to parameters mentioned in the configuration file
+    print("Number of channels : ", params["model"]["num_channels"])
 
-    train_dataloader = DataLoader(
-        training_data_for_torch,
-        batch_size=params["batch_size"],
-        shuffle=True,
-        pin_memory=False,  # params["pin_memory_dataloader"], # this is going OOM if True - needs investigation
-    )
-    params["training_samples_size"] = len(train_dataloader.dataset)
+    (
+        model,
+        optimizer,
+        train_dataloader,
+        val_dataloader,
+        scheduler,
+        params,
+    ) = create_pytorch_objects(params, training_data, validation_data, device)
 
-    val_dataloader = DataLoader(
-        validation_data_for_torch,
-        batch_size=1,
-        pin_memory=False,  # params["pin_memory_dataloader"], # this is going OOM if True - needs investigation
-    )
-
-    ## NNCF related initializations
-    # Load a configuration file to specify compression
-    nncf_config = NNCFConfig.from_json(params["model"]["nncf_config_path"])
-
-    # NNCF suitable train dataloader
-    train_dataloader = NNCFSubjectsDataLoader(train_dataloader, len(params["channel_keys"]))
-
-    # NNCF suitable eval dataloader
-    val_dataloader = NNCFSubjectsDataLoader(val_dataloader, len(params["channel_keys"]))
-
-    nncf_config = register_default_init_args(nncf_config, train_dataloader)
-
-    print(f'Model: {model}')
-
-    # Apply the specified compression algorithms to the model
-    compression_ctrl, compressed_model = create_compressed_model(model, nncf_config, dump_graphs=False)
-
-    if testingDataDefined:
-        test_dataloader = DataLoader(
-            test_data_for_torch,
-            batch_size=1,
-            pin_memory=False,  # params["pin_memory_dataloader"], # this is going OOM if True - needs investigation
+    if params["model"]["print_summary"]:
+        print_model_summary(
+            model,
+            params["batch_size"],
+            params["model"]["num_channels"],
+            params["patch_size"],
+            params["device"],
         )
 
-    # Fetch the appropriate channel keys
-    # Getting the channels for training and removing all the non numeric entries from the channels
-    params = populate_channel_keys_in_params(validation_data_for_torch, params)
-
-    # Fetch the optimizers
-    params["model_parameters"] = model.parameters()
-    optimizer = global_optimizer_dict[params["optimizer"]["type"]](params)
-    params["optimizer_object"] = optimizer
-
-    if not ("step_size" in params["scheduler"]):
-        params["scheduler"]["step_size"] = (
-            params["training_samples_size"] / params["learning_rate"]
-        )
-
-    scheduler = global_schedulers_dict[params["scheduler"]["type"]](params)
-
-    # these keys contain generators, and are not needed beyond this point in params
-    generator_keys_to_remove = ["optimizer_object", "model_parameters"]
-    for key in generator_keys_to_remove:
-        params.pop(key, None)
+    if testingDataDefined:
+        test_dataloader = get_testing_loader(params)
 
     # Start training time here
     start_time = time.time()
-    print("\n\n")
 
     if not (os.environ.get("HOSTNAME") is None):
         print("Hostname :", os.environ.get("HOSTNAME"))
@@ -334,36 +306,9 @@ def nncf_training_loop(
     valid_logger.write_header(mode="valid")
     test_logger.write_header(mode="test")
 
-    compressed_model, params["model"]["amp"], device = send_model_to_device(
-        compressed_model, amp=params["model"]["amp"], device=params["device"], optimizer=optimizer
-    )
-
-    # Calculate the weights here
-    if params["weighted_loss"]:
-        print("Calculating weights for loss")
-        # Set up the dataloader for penalty calculation
-        penalty_data = ImagesFromDataFrame(
-            training_data,
-            parameters=params,
-            train=False,
-        )
-        penalty_loader = DataLoader(
-            penalty_data,
-            batch_size=1,
-            shuffle=True,
-            pin_memory=False,
-        )
-
-        params["weights"], params["class_weights"] = get_class_imbalance_weights(
-            penalty_loader, params
-        )
-        del penalty_data, penalty_loader
-    else:
-        params["weights"], params["class_weights"] = None, None
-
     if "medcam" in params:
-        compressed_model = medcam.inject(
-            compressed_model,
+        model = medcam.inject(
+            model,
             output_dir=os.path.join(
                 output_dir, "attention_maps", params["medcam"]["backend"]
             ),
@@ -380,23 +325,38 @@ def nncf_training_loop(
     patience, start_epoch = 0, 0
     first_model_saved = False
     best_model_path = os.path.join(
-        output_dir, params["model"]["architecture"] + "_best.pth.tar"
+        output_dir, params["model"]["architecture"] + best_model_path_end
     )
 
     # if previous model file is present, load it up
     if os.path.exists(best_model_path):
-        print("Previous model found. Loading it up.")
         try:
-            main_dict = torch.load(best_model_path)
+            main_dict = load_model(best_model_path, params["device"])
+            version_check(params["version"], version_to_check=main_dict["version"])
             model.load_state_dict(main_dict["model_state_dict"])
             start_epoch = main_dict["epoch"]
             optimizer.load_state_dict(main_dict["optimizer_state_dict"])
-            best_loss = main_dict["best_loss"]
-            print("Previous model loaded successfully.")
-        except Exception as e:
-            print("Previous model could not be loaded, error: ", e)
+            best_loss = main_dict["loss"]
+            print("Previous model successfully loaded.")
+        except RuntimeWarning:
+            RuntimeWarning("Previous model could not be loaded, initializing model")
 
     print("Using device:", device, flush=True)
+
+    ## NNCF related initializations
+    # Load a configuration file to specify compression
+    nncf_config = NNCFConfig.from_json(params["model"]["nncf_config_path"])
+
+    # NNCF suitable train dataloader
+    train_dataloader = NNCFSubjectsDataLoader(train_dataloader, len(params["channel_keys"]))
+
+    # NNCF suitable eval dataloader
+    val_dataloader = NNCFSubjectsDataLoader(val_dataloader, len(params["channel_keys"]))
+
+    nncf_config = register_default_init_args(nncf_config, train_dataloader)
+
+    # Apply the specified compression algorithms to the model
+    compression_ctrl, compressed_model = create_compressed_model(model, nncf_config, dump_graphs=False)
 
     # Iterate for number of epochs
     for epoch in range(start_epoch, epochs):
@@ -445,11 +405,15 @@ def nncf_training_loop(
         # Printing times
         epoch_start_time = time.time()
         print("*" * 20)
+        print("*" * 20)
         print("Starting Epoch : ", epoch)
-        print("Epoch start time : ", get_date_time())
+        if params["verbose"]:
+            print("Epoch start time : ", get_date_time())
+
+        params["current_epoch"] = epoch
 
         epoch_train_loss, epoch_train_metric = nncf_train_network(
-            compressed_model, train_dataloader, optimizer, compression_ctrl, params
+            compressed_model, train_dataloader, optimizer, params, compression_ctrl
         )
         epoch_valid_loss, epoch_valid_metric = validate_network(
             compressed_model, val_dataloader, scheduler, params, epoch, mode="validation"
@@ -467,7 +431,8 @@ def nncf_training_loop(
             )
             test_logger.write(epoch, epoch_test_loss, epoch_test_metric)
 
-        print("Epoch end time : ", get_date_time())
+        if params["verbose"]:
+            print("Epoch end time : ", get_date_time())
         epoch_end_time = time.time()
         print(
             "Time taken for epoch : ",
@@ -481,16 +446,45 @@ def nncf_training_loop(
             best_loss = epoch_valid_loss
             best_train_idx = epoch
             patience = 0
-            torch.save(
+
+            model.eval()
+            save_model(
                 {
                     "epoch": best_train_idx,
                     "model_state_dict": model.state_dict(),
                     "optimizer_state_dict": optimizer.state_dict(),
-                    "best_loss": best_loss,
+                    "loss": best_loss,
                 },
+                model,
+                params,
                 best_model_path,
+                onnx_export=False,
             )
+            model.train()
             first_model_saved = True
+
+        if params["model"]["save_at_every_epoch"]:
+            save_model(
+                {
+                    "epoch": epoch,
+                    "model_state_dict": model.state_dict(),
+                    "optimizer_state_dict": optimizer.state_dict(),
+                    "loss": epoch_valid_loss,
+                },
+                model,
+                params,
+                os.path.join(
+                    output_dir,
+                    params["model"]["architecture"]
+                    + "_epoch_"
+                    + str(epoch)
+                    + ".pth.tar",
+                ),
+                onnx_export=False,
+            )
+            model.train()
+
+        print("Current Best epoch: ", best_train_idx)
 
         if patience > params["patience"]:
             print(
@@ -503,14 +497,19 @@ def nncf_training_loop(
     # End train time
     end_time = time.time()
 
+    print(
+        "Total time to finish Training : ",
+        (end_time - start_time) / 60,
+        " mins",
+        flush=True,
+    )
+
     # once the training is done, optimize the best model
     if os.path.exists(best_model_path):
         onnx_export = True
         if params["model"]["architecture"] in ["sdnet", "brain_age"]:
             onnx_export = False
-        elif (
-            "onnx_export" in params["model"] and params["model"]["onnx_export"] == False
-        ):
+        elif "onnx_export" in params["model"] and not (params["model"]["onnx_export"]):
             onnx_export = False
 
         if onnx_export:
@@ -538,21 +537,13 @@ def nncf_training_loop(
             except Exception as e:
                 print("Best model could not be loaded, error: ", e)
 
-    print(
-        "Total time to finish Training : ",
-        (end_time - start_time) / 60,
-        " mins",
-        flush=True,
-    )
-
-
 if __name__ == "__main__":
 
     import argparse, pickle, pandas
 
     torch.multiprocessing.freeze_support()
     # parse the cli arguments here
-    parser = argparse.ArgumentParser(description="NNCF optimizations Loop of GANDLF")
+    parser = argparse.ArgumentParser(description="NNCF optimizations loop of GANDLF")
     parser.add_argument(
         "-train_loader_pickle", type=str, help="Train loader pickle", required=True
     )
@@ -580,7 +571,7 @@ if __name__ == "__main__":
     else:
         testingDataFromPickle = pandas.read_pickle(testingData_str)
 
-    nncf_training_loop(
+    training_loop(
         training_data=trainingDataFromPickle,
         validation_data=validationDataFromPickle,
         output_dir=args.outputDir,
