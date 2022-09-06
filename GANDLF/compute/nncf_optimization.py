@@ -86,7 +86,7 @@ def nncf_train_network(model, train_dataloader, optimizer, params, compression_c
         tqdm(train_dataloader, desc="Looping over training data")
     ):
         optimizer.zero_grad()
-        compression_ctrl.scheduler.step() ## NNCF Compression control step
+        compression_ctrl.scheduler.step()  ## NNCF Compression control step
         image = (
             torch.cat(
                 [subject[key][torchio.DATA] for key in params["channel_keys"]], dim=1
@@ -204,23 +204,34 @@ def nncf_train_network(model, train_dataloader, optimizer, params, compression_c
 
     return average_epoch_train_loss, average_epoch_train_metric
 
+
 class NNCFSubjectsDataLoader(PTInitializingDataLoader):
     def __init__(self, data_loader: DataLoader, num_channels):
         self._data_loader = data_loader
         self.num_channels = num_channels
-    
+
     @property
     def batch_size(self):
         return self._data_loader.batch_size
-    
+
     def __len__(self):
         return len(self._data_loader)
 
     def get_inputs(self, subject: Any) -> Tuple[Tuple, Dict]:
-        # Iterate through the input channels for each subject 
-        image = torch.cat(
-                [subject[str(key)][torchio.DATA] for key in range(1, self.num_channels+1)], dim=1).float().to('cpu')
+        # Iterate through the input channels for each subject
+        image = (
+            torch.cat(
+                [
+                    subject[str(key)][torchio.DATA]
+                    for key in range(1, self.num_channels + 1)
+                ],
+                dim=1,
+            )
+            .float()
+            .to("cpu")
+        )
         return (image,), {}
+
 
 def nncf_training_loop(
     training_data,
@@ -348,7 +359,9 @@ def nncf_training_loop(
     nncf_config = NNCFConfig.from_json(params["model"]["nncf_config_path"])
 
     # NNCF suitable train dataloader
-    train_dataloader = NNCFSubjectsDataLoader(train_dataloader, len(params["channel_keys"]))
+    train_dataloader = NNCFSubjectsDataLoader(
+        train_dataloader, len(params["channel_keys"])
+    )
 
     # NNCF suitable eval dataloader
     val_dataloader = NNCFSubjectsDataLoader(val_dataloader, len(params["channel_keys"]))
@@ -356,7 +369,9 @@ def nncf_training_loop(
     nncf_config = register_default_init_args(nncf_config, train_dataloader)
 
     # Apply the specified compression algorithms to the model
-    compression_ctrl, compressed_model = create_compressed_model(model, nncf_config, dump_graphs=False)
+    compression_ctrl, compressed_model = create_compressed_model(
+        model, nncf_config, dump_graphs=False
+    )
 
     # Iterate for number of epochs
     for epoch in range(start_epoch, epochs):
@@ -416,7 +431,12 @@ def nncf_training_loop(
             compressed_model, train_dataloader, optimizer, params, compression_ctrl
         )
         epoch_valid_loss, epoch_valid_metric = validate_network(
-            compressed_model, val_dataloader, scheduler, params, epoch, mode="validation"
+            compressed_model,
+            val_dataloader,
+            scheduler,
+            params,
+            epoch,
+            mode="validation",
         )
 
         patience += 1
@@ -536,6 +556,7 @@ def nncf_training_loop(
                 )
             except Exception as e:
                 print("Best model could not be loaded, error: ", e)
+
 
 if __name__ == "__main__":
 
