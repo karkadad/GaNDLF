@@ -24,18 +24,18 @@ def TrainingManager(dataframe, outputDir, parameters, device, resume, reset):
         Path(outputDir).mkdir(parents=True, exist_ok=True)
 
     # save the current model configuration as a sanity check
-    currentModelConfigPickle = os.path.join(outputDir, "parameters.pkl")
-    if (not os.path.exists(currentModelConfigPickle)) or reset or resume:
-        with open(currentModelConfigPickle, "wb") as handle:
-            pickle.dump(parameters, handle, protocol=pickle.HIGHEST_PROTOCOL)
-    else:
-        if os.path.exists(currentModelConfigPickle):
-            print(
-                "Using previously saved parameter file",
-                currentModelConfigPickle,
-                flush=True,
-            )
-            parameters = pickle.load(open(currentModelConfigPickle, "rb"))
+    # currentModelConfigPickle = os.path.join(outputDir, "parameters.pkl")
+    # if (not os.path.exists(currentModelConfigPickle)) or reset or resume:
+    #     with open(currentModelConfigPickle, "wb") as handle:
+    #         pickle.dump(parameters, handle, protocol=pickle.HIGHEST_PROTOCOL)
+    # else:
+    #     if os.path.exists(currentModelConfigPickle):
+    #         print(
+    #             "Using previously saved parameter file",
+    #             currentModelConfigPickle,
+    #             flush=True,
+    #         )
+    #         parameters = pickle.load(open(currentModelConfigPickle, "rb"))
 
     # check for single fold training
     singleFoldValidation = False
@@ -245,22 +245,28 @@ def TrainingManager(dataframe, outputDir, parameters, device, resume, reset):
 
             # parallel_compute_command is an empty string, thus no parallel computing requested
             if (not parameters["parallel_compute_command"]) or (singleFoldValidation):
-                if parameters["model"]["optimization_mode"] in ['ptq', 'qat', 'fp', 'kd']:
-                    if parameters["model"]["optimization_mode"] == 'qat':
+                if parameters["model"]["optimization_mode"] in [
+                    "ptq",
+                    "qat",
+                    "fp",
+                    "kd",
+                ]:
+                    if parameters["model"]["optimization_mode"] == "qat":
                         from GANDLF.compute import nncf_training_loop
+
                         nncf_training_loop(
-                        training_data=trainingData,
-                        validation_data=validationData,
-                        output_dir=outputDir,
-                        device=device,
-                        params=parameters,
-                        testing_data=None,
-                    )
+                            training_data=trainingData,
+                            validation_data=validationData,
+                            output_dir=outputDir,
+                            device=device,
+                            params=parameters,
+                            testing_data=None,
+                        )
                     else:
                         sys.exit(
-                                "Only the following optimizations are supported: \
+                            "Only the following optimizations are supported: \
                                         Quantization aware training (qat) for now."
-                            )
+                        )
                 else:
                     training_loop(
                         training_data=trainingData,
@@ -343,23 +349,24 @@ def TrainingManager_split(
             )
             parameters = pickle.load(open(currentModelConfigPickle, "rb"))
 
-    if parameters["model"]["optimization_mode"] in ['ptq', 'qat', 'fp', 'kd']:
-        if parameters["model"]["optimization_mode"] == 'qat':
+    if parameters["model"]["optimization_mode"] in ["ptq", "qat", "fp", "kd"]:
+        if parameters["model"]["optimization_mode"] == "qat":
             from GANDLF.compute import nncf_training_loop
-            print('Starting NNCF training!!!')
+
+            print("Starting NNCF training!!!")
             nncf_training_loop(
-            training_data=dataframe_train,
-            validation_data=dataframe_validation,
-            output_dir=outputDir,
-            device=device,
-            params=parameters,
-            testing_data=None,
-        )
+                training_data=dataframe_train,
+                validation_data=dataframe_validation,
+                output_dir=outputDir,
+                device=device,
+                params=parameters,
+                testing_data=None,
+            )
         else:
             sys.exit(
-                    "Only the following optimizations are supported: \
+                "Only the following optimizations are supported: \
                             Quantization aware training (qat) for now."
-                )
+            )
     else:
         training_loop(
             training_data=dataframe_train,
