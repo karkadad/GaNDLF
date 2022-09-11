@@ -46,6 +46,7 @@ def validate_network(
     """
     print("*" * 20)
     print("Starting " + mode + " : ")
+    print("Device " + str(params["device"]) + " : ")
     print("*" * 20)
     # Initialize a few things
     total_epoch_valid_loss = 0
@@ -81,6 +82,7 @@ def validate_network(
     # Set the model to valid
     if params["model"]["type"] == "torch":
         model.eval()
+
 
     # # putting stuff in individual arrays for correlation analysis
     # all_targets = []

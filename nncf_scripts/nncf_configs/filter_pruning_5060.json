@@ -29,7 +29,7 @@
         "mode": "early_exit",
         "params": {
             "maximal_absolute_accuracy_degradation": 0.01,
-            "maximal_total_epochs": 2
+            "maximal_total_epochs": 6
         }
     },
     "compression": [

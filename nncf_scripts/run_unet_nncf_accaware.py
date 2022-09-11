@@ -77,6 +77,7 @@ def main():
     model.load_state_dict(main_dict["model_state_dict"], strict=False)
     if torch.cuda.is_available():
         model.cuda()
+        print("model.cuda() executed. Using device:", device)
 
     optimizer, _ = configure_optimizers_fn()
 
@@ -86,6 +87,10 @@ def main():
 
     # Create compressed model
     compression_ctrl, compressed_model = create_compressed_model(model, nncf_config)
+
+    # if torch.cuda.is_available():
+    #     compressed_model.cuda()
+    #     print("compressed_model.cuda() executed. Using device:", device)
 
     def validate_fn(compressed_model, epoch=None):
         return validate_network(
