@@ -1,3 +1,4 @@
+import os
 import torch
 from GANDLF.data.ImagesFromDataFrame import ImagesFromDataFrame
 from GANDLF.utils import (
@@ -5,7 +6,6 @@ from GANDLF.utils import (
     populate_channel_keys_in_params,
     parseTrainingCSV,
 )
-
 
 def load_data(train_data_csv, valid_data_csv, parameters, train_mode=True):
     train_data_full, train_headers = parseTrainingCSV(train_data_csv, train=train_mode)
@@ -25,11 +25,11 @@ def load_data(train_data_csv, valid_data_csv, parameters, train_mode=True):
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print("Using device:", device)
 
+    cwd = os.getcwd()
+
     parameters["device"] = device
     parameters["weights"], parameters["class_weights"] = None, None
-    parameters[
-        "output_dir"
-    ] = "/home/ubuntu/GaNDLF-dk-nncf/GaNDLF/nncf_scripts/nncf_accaware_outdir"
+    parameters["output_dir"] = f"{cwd}/nncf_scripts/nncf_accaware_outdir"
     # print(parameters)
 
     train_dataloader = torch.utils.data.DataLoader(

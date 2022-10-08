@@ -496,5 +496,7 @@ def validate_network(
             file.write(outputToWrite)
             file.close()
 
-    return average_epoch_valid_metric[metric]
-    # return average_epoch_valid_loss, average_epoch_valid_metric
+    if params['train_mode'] :
+        return average_epoch_valid_metric[metric] #for training
+    else:
+        return average_epoch_valid_loss, average_epoch_valid_metric # for inference

@@ -70,8 +70,11 @@ def inference_loop(
                 raise ValueError(
                     "The specified model was not found: {0}.".format(file_to_check)
                 )
+        # load model
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print("Using device:", device)
 
-        main_dict = torch.load(file_to_check)
+        main_dict = torch.load(file_to_check, map_location=torch.device(device))
         model.load_state_dict(main_dict["model_state_dict"])
         model.eval()
     elif parameters["model"]["type"].lower() == "openvino":
