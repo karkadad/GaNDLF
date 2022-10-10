@@ -1,6 +1,6 @@
 '''
 USAGE:
-mprof run python bench_pt_ov.py \
+mprof run python bench_mem_pt_ov.py \
 -d /home/rpanchum/upenn/data/sidd-tcga/val_data_sidd-tcga_4mod_244/data_processed_1.csv \
 -r 4 -p OV-NNCF-PRUN06_ICX \
 2>&1 | tee infer_logs/bench_mem_OV-NNCF-PRUN06_ICX.log

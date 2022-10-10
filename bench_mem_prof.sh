@@ -10,7 +10,7 @@ fmwrk_mode_list=( 'PT-FP32' 'OV-FP32' 'OV-POT-INT8' 'OV-NNCF-INT8' 'OV-NNCF-PRUN
 
 for i in ${!run_mode_list[@]}; do
     fmwrk_mode=${fmwrk_mode_list[i]}_${HW}
-    cmd="mprof run python bench_pt_ov.py -d $INP_DATA -r ${run_mode_list[i]} \
+    cmd="mprof run python bench_mem_pt_ov.py -d $INP_DATA -r ${run_mode_list[i]} \
     -p ${fmwrk_mode} \
     2>&1 | tee infer_logs/bench_mem_${fmwrk_mode}.log"
     echo $cmd
@@ -23,7 +23,7 @@ done
 # Using /usr/bin/time -v for profiling
 # for i in ${!run_mode_list[@]}; do
 #     fmwrk_mode=${fmwrk_mode_list[i]}_${HW}
-#     cmd="/usr/bin/time -v python bench_pt_ov.py -d $INP_DATA -r ${run_mode_list[i]} \
+#     cmd="/usr/bin/time -v python bench_mem_pt_ov.py -d $INP_DATA -r ${run_mode_list[i]} \
 #     -p ${fmwrk_mode} \
 #     2>&1 | tee infer_logs/bench_mem_${fmwrk_mode}.log"
 #     echo $cmd
