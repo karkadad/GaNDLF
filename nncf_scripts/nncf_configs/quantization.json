@@ -1,0 +1,48 @@
+{
+    "model": "3dresunet",
+    "model_dir": "3dunet_exp/val_data_dir",
+    "log_dir": "nncf_accaware_outdir",
+    "model_name": "resunet_best.pth.tar",
+    "batch_size": 1,
+    "pretrained": true,
+    "epochs": 2,
+    "device": "cpu",
+    "cpu_only": true,
+    "input_info": {
+        "sample_size": [
+            1,
+            1,
+            240,
+            240,
+            144
+        ]
+    },
+    "optimizer": {
+        "type": "Adam",
+        "base_lr": 0.001,
+        "weight_decay": 1e-5,
+        "optimizer_params": {
+            "amsgrad": false
+        }
+    },
+    "accuracy_aware_training": {
+        "mode": "early_exit",
+        "params": {
+            "maximal_absolute_accuracy_degradation": 0.01,
+            "maximal_total_epochs": 5
+        }
+    },
+    "compression": [
+        {
+            "algorithm": "quantization",
+            "initializer": {
+                "range": {
+                    "num_init_samples": 120
+                },
+                "batchnorm_adaptation": {
+                    "num_bn_adaptation_samples": 1, // Number of samples from the training dataset to pass through the model at initialization in order to update batchnorm statistics of the original model. The actual number of samples will be a closest multiple of the batch size.
+                }
+            }
+        }
+    ]
+}
