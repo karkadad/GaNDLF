@@ -29,10 +29,19 @@
         "mode": "early_exit",
         "params": {
             "maximal_absolute_accuracy_degradation": 0.01,
-            "maximal_total_epochs": 5
+            "maximal_total_epochs": 10
         }
     },
     "compression": [
+        {
+            "algorithm": "filter_pruning",
+            "pruning_init": 0.6,
+            "params": {
+                "schedule": "exponential",
+                "pruning_target": 0.6,
+                "filter_importance": "geometric_median"
+            }
+        },
         {
             "algorithm": "quantization",
             "initializer": {
@@ -43,6 +52,10 @@
                     "num_bn_adaptation_samples": 1, // Number of samples from the training dataset to pass through the model at initialization in order to update batchnorm statistics of the original model. The actual number of samples will be a closest multiple of the batch size.
                 }
             }
+        },
+        {
+            "algorithm": "knowledge_distillation",
+            "type": "softmax"
         }
     ]
 }

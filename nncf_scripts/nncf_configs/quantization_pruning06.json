@@ -29,10 +29,19 @@
         "mode": "early_exit",
         "params": {
             "maximal_absolute_accuracy_degradation": 0.01,
-            "maximal_total_epochs": 5
+            "maximal_total_epochs": 8
         }
     },
     "compression": [
+        {
+            "algorithm": "filter_pruning",
+            "pruning_init": 0.6,
+            "params": {
+                "schedule": "exponential",
+                "pruning_target": 0.6,
+                "filter_importance": "geometric_median"
+            }
+        },
         {
             "algorithm": "quantization",
             "initializer": {
